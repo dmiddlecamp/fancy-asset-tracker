@@ -120,6 +120,9 @@ class Adafruit_LIS3DH : public Adafruit_Sensor {
 
   uint8_t getOrientation(void);
 
+  void setClick(uint8_t c, uint8_t clickthresh, uint8_t timelimit = 10, uint8_t timelatency = 20, uint8_t timewindow = 255);
+  uint8_t getClick(void);
+
   int16_t x, y, z;
   float x_g, y_g, z_g;
 

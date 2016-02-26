@@ -212,6 +212,44 @@ void Adafruit_LIS3DH::setRange(lis3dh_range_t range)
 
 /**************************************************************************/
 /*!
+    @brief  Set INT to output for single or double click
+*/
+/**************************************************************************/
+
+void Adafruit_LIS3DH::setClick(uint8_t c, uint8_t clickthresh, uint8_t timelimit, uint8_t timelatency, uint8_t timewindow) {
+  if (!c) {
+    //disable int
+    uint8_t r = readRegister8(LIS3DH_REG_CTRL3);
+    r &= ~(0x80); // turn off I1_CLICK
+    writeRegister8(LIS3DH_REG_CTRL3, r);
+    writeRegister8(LIS3DH_REG_CLICKCFG, 0);
+    return;
+  }
+  // else...
+
+  writeRegister8(LIS3DH_REG_CTRL3, 0x80); // turn on int1 click
+  writeRegister8(LIS3DH_REG_CTRL5, 0x08); // latch interrupt on int1
+
+  if (c == 1)
+    writeRegister8(LIS3DH_REG_CLICKCFG, 0x15); // turn on all axes & singletap
+  if (c == 2)
+    writeRegister8(LIS3DH_REG_CLICKCFG, 0x2A); // turn on all axes & doubletap
+
+
+  writeRegister8(LIS3DH_REG_CLICKTHS, clickthresh); // arbitrary
+  writeRegister8(LIS3DH_REG_TIMELIMIT, timelimit); // arbitrary
+  writeRegister8(LIS3DH_REG_TIMELATENCY, timelatency); // arbitrary
+  writeRegister8(LIS3DH_REG_TIMEWINDOW, timewindow); // arbitrary
+}
+
+uint8_t Adafruit_LIS3DH::getClick(void) {
+  return readRegister8(LIS3DH_REG_CLICKSRC);
+}
+
+
+
+/**************************************************************************/
+/*!
     @brief  Sets the g range for the accelerometer
 */
 /**************************************************************************/
