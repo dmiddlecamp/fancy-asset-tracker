@@ -156,6 +156,9 @@ void loop() {
         lastPublish = 0;
         lastMotion = 0;
 
+        // Hey GPS, please stop using power, kthx.
+        digitalWrite(D6, HIGH);
+
         // lets give ourselves a chance to settle, deal with anything pending, achieve enlightenment...
         delay(10*1000);
         System.sleep(SLEEP_MODE_DEEP, HOW_LONG_SHOULD_WE_SLEEP);
