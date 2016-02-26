@@ -9,13 +9,16 @@ Adafruit_GPS GPS(&mySerial);
 int lastSecond = 0;
 bool ledState = false;
 
+// lets keep the radio off until we get a fix, or 2 minutes go by.
 SYSTEM_MODE(SEMI_AUTOMATIC);
+
 
 void setup() {
     // electron asset tracker shield needs this to enable the power to the gps module.
     pinMode(D6, OUTPUT);
     digitalWrite(D6, LOW);
 
+    // for blinking.
     pinMode(D7, OUTPUT);
     digitalWrite(D7, LOW);
 
@@ -31,13 +34,10 @@ void setup() {
 
     // request everything!
     GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_ALLDATA);
-
-    // request absolutely everything!
-    //GPS.sendCommand("$PMTK314,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1*29");
     delay(250);
 
     // turn off antenna updates
-    GPS.sendCommand(PGCMD_ANTENNA);
+    GPS.sendCommand(PGCMD_NOANTENNA);
     delay(250);
 }
 
@@ -51,6 +51,7 @@ void loop() {
     while (mySerial.available()) {
         char c = GPS.read();
 
+        // lets echo the GPS output until we get a good clock reading, then lets calm things down.
         if (!hasGPSTime) {
             Serial.print(c);
         }
@@ -86,65 +87,9 @@ void loop() {
                 );
 
             Serial.println(currentTime);
-
-
         }
         else {
             Serial.println("GPS TIME: searching the skies...");
         }
     }
-}
- 
- 
-
- 
- 
-//
-//void buildGpsDebugOutput() {
-//
-
-//    Serial.print("Fix: "); Serial.print((int)GPS.fix);
-//    Serial.print(" quality: "); Serial.println((int)GPS.fixquality);
-//
-//    //if (GPS.fix)
-//    //{
-//    Serial.print("Location: ");
-//    Serial.print(GPS.latitude, 4);
-//    Serial.print(GPS.lat);
-//    Serial.print(", ");
-//
-//    Serial.print(GPS.longitude, 4);
-//    Serial.println(GPS.lon);
-//
-//    Serial.print("Speed (knots): "); Serial.println(GPS.speed);
-//    Serial.print("Angle: "); Serial.println(GPS.angle);
-//    Serial.print("Altitude: "); Serial.println(GPS.altitude);
-//    Serial.print("Satellites: "); Serial.println((int)GPS.satellites);
-//
-//    //TODO: BETTER +/- for longitude
-//
-//   // _gpsDebugLines = ...
-//}
-//
-
-
-//int performGPSCommand(String gpsCmd) {
-//    nextGpsCommand = gpsCmd;
-//
-//    String cmd = String::format("$%s*%02x", gpsCmd.c_str(), crc8(gpsCmd));
-//    mySerial.println(cmd);
-//    return 1;
-//}
-
-
-
-int crc8(String str) {
-  int len = str.length();
-  const char * buffer = str.c_str();
-
-  int crc = 0;
-  for(int i=0;i<len;i++) {
-    crc ^= (buffer[i] & 0xff);
-  }
-  return crc;
 }
