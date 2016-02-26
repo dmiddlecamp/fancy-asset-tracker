@@ -31,3 +31,9 @@ node_modules
 
 # Optional REPL history
 .node_repl_history
+
+#binaries we build
+*.bin
+
+#the place where we build binaries!
+temp_build
