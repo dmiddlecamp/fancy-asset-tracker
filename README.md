@@ -7,7 +7,7 @@ Here are some fancy asset tracker apps that use the AssetTracker shield from Par
 How to use
 ===
 
-Make sure you have the particle-cli installed... and then: Pick your demo and build it!
+Make sure you have the [particle-cli](https://github.com/spark/particle-cli) installed... and then: Pick your demo and build it!
 
 ```
 # build your demo!
