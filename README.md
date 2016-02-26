@@ -1,7 +1,7 @@
 fancy asset tracker demos!
 ====
 
-Here are some fancy asset tracker apps that use the AssetTracker shield from Particle!
+Here are some fancy asset tracker apps that use the [Asset Tracker Shield from Particle](https://docs.particle.io/datasheets/kits/#electron-asset-tracker)!
 
 
 How to use
