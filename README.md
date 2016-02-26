@@ -27,3 +27,13 @@ Attributions
 ===
 
 This project is possible thanks to awesome work from Particle and Adafruit, go buy stuff from them!
+
+
+Example projects
+===
+
+* gps-clock
+  * Basic example that demonstrates using the GPS clock and raw location!
+  
+* motion-tracker
+  * Basic example that manages power using the built in accelerometer and publishes location while moving
