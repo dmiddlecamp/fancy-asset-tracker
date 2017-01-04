@@ -17,7 +17,7 @@ FuelGauge fuel;
 
 #define MY_NAME "AssetTracker"
 
-#define CLICKTHRESHHOLD 20
+#define CLICKTHRESHHOLD 100
 
 
 int lastSecond = 0;
