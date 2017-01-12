@@ -65,8 +65,6 @@ void setup() {
     lastMotion = 0;
     lastPublish = 0;
 
-    initAccel();
-
     // electron asset tracker shield needs this to enable the power to the gps module.
     pinMode(D6, OUTPUT);
     digitalWrite(D6, LOW);
@@ -74,6 +72,9 @@ void setup() {
     // for blinking.
     pinMode(D7, OUTPUT);
     digitalWrite(D7, LOW);
+
+    // wait a little for the GPS to wakeup
+    delay(250);
 
     GPS.begin(9600);
     mySerial.begin(9600);
@@ -84,7 +85,6 @@ void setup() {
     GPS.sendCommand("$PMTK101*32");
     delay(250);
 
-
     // request everything!
     GPS.sendCommand(PMTK_SET_NMEA_OUTPUT_ALLDATA);
     delay(250);
@@ -92,6 +92,8 @@ void setup() {
     // turn off antenna updates
     GPS.sendCommand(PGCMD_NOANTENNA);
     delay(250);
+
+    initAccel();
 }
 
 
