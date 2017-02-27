@@ -43,13 +43,16 @@ boolean Adafruit_GPS::parse(char *nmea) {
     }
     if (sum != 0) {
       // bad checksum :(
-      Particle.publish("GPS", "{ error: \"bad checksum\"}", 60, PRIVATE );
+      Serial.println("GPS-PARSE ERROR - BAD CHECKSUM");
+      Serial.println("sum was " + String(sum));
+//      Particle.publish("GPS", "{error:\"bad checksum\"}", 60, PRIVATE );
+//      delay(1000);  //avoid overpublishing?
       return false;
     }
   }
 
   // look for a few common sentences
-  if (strstr(nmea, "$GPGGA")) {
+  if ((strstr(nmea, "$GPGGA")) || (strstr(nmea, "$GNGGA"))) {
     // found GGA
     char *p = nmea;
     // get time
@@ -82,6 +85,10 @@ boolean Adafruit_GPS::parse(char *nmea) {
     else if (p[0] == ',') lon = 0;
     else return false;
 
+    if (lon == 'W') {
+        longitude *= -1;
+    }
+
     p = strchr(p, ',')+1;
     fixquality = atoi(p);
 
@@ -98,7 +105,8 @@ boolean Adafruit_GPS::parse(char *nmea) {
     geoidheight = atof(p);
     return true;
   }
-  if (strstr(nmea, "$GPRMC")) {
+
+  if ((strstr(nmea, "$GPRMC")) || (strstr(nmea, "$GNRMC"))) {
    // found RMC
     char *p = nmea;
 
@@ -140,6 +148,10 @@ boolean Adafruit_GPS::parse(char *nmea) {
     else if (p[0] == 'E') lon = 'E';
     else if (p[0] == ',') lon = 0;
     else return false;
+
+    if (lon == 'W') {
+        longitude *= -1;
+    }
 
     // speed
     p = strchr(p, ',')+1;
