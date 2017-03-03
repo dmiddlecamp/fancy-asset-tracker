@@ -109,6 +109,8 @@ void setup() {
     GPS.sendCommand(PGCMD_NOANTENNA);
     delay(250);
 
+    delay(2000);    // give the module a long time to warm up just in case?
+
     // select internal antenna
     antennaSelect(internalANT);
     //antennaSelect(externalANT);
