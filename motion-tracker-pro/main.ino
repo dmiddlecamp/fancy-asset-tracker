@@ -22,6 +22,7 @@ FuelGauge fuel;
 
 int lastSecond = 0;
 bool ledState = false;
+int lastLevel = 0;
 
 // lets keep the radio off until we get a fix, or 2 minutes go by.
 //SYSTEM_MODE(SEMI_AUTOMATIC);
@@ -33,6 +34,7 @@ STARTUP(System.enableFeature(FEATURE_RETAINED_MEMORY));
 
 unsigned long lastMotion = 0;
 unsigned long lastPublish = 0;
+unsigned long lastReading = 0;
 time_t lastIdleCheckin = 0;
 
 #define PUBLISH_DELAY (60 * 1000)
@@ -62,6 +64,9 @@ time_t lastIdleCheckin = 0;
 
 
 void setup() {
+
+    digitalWrite(A5, HIGH);         // power pin for water sensor
+
     lastMotion = 0;
     lastPublish = 0;
 
@@ -168,7 +173,18 @@ void loop() {
 //        System.sleep(SLEEP_MODE_DEEP, HOW_LONG_SHOULD_WE_SLEEP);
 //    }
 
-    delay(10);
+    if ((now - lastReading) > 2500) {
+        lastReading = now;
+        int currentLevel = getLevelReading();
+
+        if (lastLevel != currentLevel) {
+            publishLevel();
+        }
+        lastLevel = currentLevel;
+        delay(1000);
+    }
+
+    delay(5);
 }
 
 
@@ -177,13 +193,8 @@ void checkGPS() {
     while (mySerial.available()) {
         char c = GPS.read();
 
-        // lets echo the GPS output until we get a good clock reading, then lets calm things down.
-        //if (!hasGPSTime) {
-        //   Serial.print(c);
-        //}
-
         if (GPS.newNMEAreceived()) {
-            Serial.println(GPS.lastNMEA());
+            //Serial.println(GPS.lastNMEA());
             GPS.parse(GPS.lastNMEA());
 
             //Serial.println("my location is " + String::format(" %f, %f, ", GPS.latitude, GPS.longitude));
@@ -236,17 +247,18 @@ void publishGPS() {
 
 
 
-    //
-    String trkJsonLoc = String("{")
-        // does this correctly indicate if this value is stale?
-        //+ "\"c_hour\":" + String::format("%d", _cell_locate.hour)
-        //+ ",\"c_min\":" + String::format("%d", _cell_locate.minute)
-        + "\"c_lat\":" + String(convertDegMinToDecDeg(GPS.latitude))
-        + ",\"c_lng\":" + String(convertDegMinToDecDeg(GPS.longitude))
-        + ",\"c_unc\":" + String(GPS.fixquality)
-        + ",\"c_alt\":" + String(GPS.altitude)
-        + "}";
-     Particle.publish("trk/loc", trkJsonLoc, 60, PRIVATE);
+    float latitude = convertDegMinToDecDeg(GPS.latitude);
+    float longitude = convertDegMinToDecDeg(GPS.longitude);
+
+    if ((latitude != 0) && (longitude != 0)) {
+        String trkJsonLoc = String("{")
+            + "\"c_lat\":" + String(convertDegMinToDecDeg(GPS.latitude))
+            + ",\"c_lng\":" + String(convertDegMinToDecDeg(GPS.longitude))
+            + ",\"c_unc\":" + String(GPS.fixquality)
+            + ",\"c_alt\":" + String(GPS.altitude)
+            + "}";
+         Particle.publish("trk/loc", trkJsonLoc, 60, PRIVATE);
+     }
 
 
     float batteryVoltage = fuel.getVCell();
@@ -259,13 +271,55 @@ void publishGPS() {
      Particle.publish("trk/dev", devJson, 60, PRIVATE);
 
 
-     int value = rand() * 100;
-     String sensorJson = String("{")
-            + "\"level\":" + String::format("%d", value)
-            + "}";
-     Particle.publish("trk/level", sensorJson, 60, PRIVATE);
+    publishLevel();
+
+//          int value = rand() * 100;
+//     String sensorJson = String("{")
+//            + "\"level\":" + String::format("%d", value)
+//            + "}";
+//     Particle.publish("trk/level", sensorJson, 60, PRIVATE);
 }
 
+
+
+void publishLevel() {
+    int levelValue = getLevelReading();
+
+    accel.read();
+    float aX = accel.x;
+    float aY = accel.y;
+    float aZ = accel.z;
+
+
+     String sensorJson = String("{")
+            + "\"level\":" + String::format("%d", levelValue)
+            + ",\"tempF\":" + String::format("%d", 0)
+            + ",\"x\":" + String::format("%.2f", aX)
+            + ",\"y\":" + String::format("%.2f", aY)
+            + ",\"z\":" + String::format("%.2f", aZ)
+
+            + "}";
+     Particle.publish("trk/env", sensorJson, 60, PRIVATE);
+}
+
+
+int getLevelReading() {
+
+    //
+    int emptyLevelValue = 3500;
+    int fullLevelValue = 1800;
+    // about 2 inches of water ->
+    //int levelValue = analogRead(D0) - 2434;
+
+    //delay(50);
+    int levelReading = analogRead(A4);
+    int levelValue = map(levelReading, fullLevelValue, emptyLevelValue, 0, 100);
+    levelValue = 100 - levelValue;  // flip it
+
+    Serial.println("water level is " + String(levelReading) + " percentage full is " + String(levelValue));
+
+    return levelValue;
+}
 
 int crc8(String str) {
   int len = str.length();
