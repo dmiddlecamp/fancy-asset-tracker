@@ -8,6 +8,8 @@
 #include <ctype.h>
 
 #define STARTING_LATITUDE_LONGITUDE_ALTITUDE "44.9778,-93.2650,200"
+uint8_t internalANT[]={0xB5,0x62,0x06,0x13,0x04,0x00,0x00,0x00,0xF0,0x7D,0x8A,0x2A};
+uint8_t externalANT[]={0xB5,0x62,0x06,0x13,0x04,0x00,0x01,0x00,0xF0,0x7D,0x8B,0x2E};
 
 
 #define mySerial Serial1
@@ -64,6 +66,15 @@ time_t lastIdleCheckin = 0;
 
 
 void setup() {
+    // mirror RGB PINS
+    RGB.mirrorTo(B3,B2,B1,true, true);
+
+    // POWER TEMPERATURE SENSOR
+	pinMode(A1,OUTPUT);
+    pinMode(B5,OUTPUT);
+    digitalWrite(B5, HIGH);
+    digitalWrite(A1, LOW);
+
 
     digitalWrite(A5, HIGH);         // power pin for water sensor
 
@@ -97,6 +108,11 @@ void setup() {
     // turn off antenna updates
     GPS.sendCommand(PGCMD_NOANTENNA);
     delay(250);
+
+    // select internal antenna
+    antennaSelect(internalANT);
+    //antennaSelect(externalANT);
+
 
     suggest_time_and_location();
 
@@ -173,16 +189,16 @@ void loop() {
 //        System.sleep(SLEEP_MODE_DEEP, HOW_LONG_SHOULD_WE_SLEEP);
 //    }
 
-    if ((now - lastReading) > 2500) {
-        lastReading = now;
-        int currentLevel = getLevelReading();
-
-        if (lastLevel != currentLevel) {
-            publishLevel();
-        }
-        lastLevel = currentLevel;
-        delay(1000);
-    }
+//    if ((now - lastReading) > 2500) {
+//        lastReading = now;
+//        int currentLevel = getLevelReading();
+//
+//        if (lastLevel != currentLevel) {
+//            publishLevel();
+//        }
+//        lastLevel = currentLevel;
+//        delay(1000);
+//    }
 
     delay(5);
 }
@@ -194,7 +210,7 @@ void checkGPS() {
         char c = GPS.read();
 
         if (GPS.newNMEAreceived()) {
-            //Serial.println(GPS.lastNMEA());
+            Serial.println(GPS.lastNMEA());
             GPS.parse(GPS.lastNMEA());
 
             //Serial.println("my location is " + String::format(" %f, %f, ", GPS.latitude, GPS.longitude));
@@ -290,10 +306,14 @@ void publishLevel() {
     float aY = accel.y;
     float aZ = accel.z;
 
+    float temperatureC = ((3300*analogRead(A0)/4096.0)-500)/10.0;
+    float temperatureF = (temperatureC * (9/5)) + 32;
+
+
 
      String sensorJson = String("{")
             + "\"level\":" + String::format("%d", levelValue)
-            + ",\"tempF\":" + String::format("%d", 0)
+            + ",\"tempF\":" + String::format("%d", temperatureF)
             + ",\"x\":" + String::format("%.2f", aX)
             + ",\"y\":" + String::format("%.2f", aY)
             + ",\"z\":" + String::format("%.2f", aZ)
@@ -365,3 +385,49 @@ void suggest_time_and_location() {
     delay(250);
 
 }
+
+
+
+void antennaSelect(uint8_t *buf){
+
+    for(uint8_t i=0;i<12;i++)
+    {
+        Serial1.write(buf[i]); //send the command to gps module
+        Serial.print(buf[i],HEX);
+        Serial.print(",");
+    }
+    Serial.println("");
+}
+
+//
+//#include "AssetTracker.h"
+//
+//AssetTracker t = AssetTracker();
+//
+
+//void setup() {
+//
+//    t.begin();
+//
+//    t.gpsOn();
+//
+//    Serial.begin(9600);
+//    delay(2000);
+//
+//    // uncomment the appropriate line
+//    antennaSelect(internalANT);
+//    //antennaSelect(externalANT);
+//
+//    delay(300);
+//
+//}
+//
+//void loop() {
+//
+//    t.updateGPS();
+//    Serial.println(t.preNMEA());
+//
+//    delay(1000);
+//
+//}
+//
