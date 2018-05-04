@@ -7,6 +7,20 @@
 #include "math.h"
 #include <ctype.h>
 
+#include "google-maps-device-locator.h"
+
+GoogleMapsDeviceLocator locator;
+
+float cellularLatitude;
+float cellularLongitude;
+float cellularAccuracy;
+bool usingCellularLocation = false;
+
+#include "Adafruit_MLX90614.h"
+
+Adafruit_MLX90614 mlx = Adafruit_MLX90614();
+
+
 #define STARTING_LATITUDE_LONGITUDE_ALTITUDE "44.9778,-93.2650,200"
 uint8_t internalANT[]={0xB5,0x62,0x06,0x13,0x04,0x00,0x00,0x00,0xF0,0x7D,0x8A,0x2A};
 uint8_t externalANT[]={0xB5,0x62,0x06,0x13,0x04,0x00,0x01,0x00,0xF0,0x7D,0x8B,0x2E};
@@ -33,8 +47,8 @@ int lastLevel = 0;
 //
 //
 
-//PRODUCT_ID(3917);
-//PRODUCT_VERSION(5);
+PRODUCT_ID(5397);
+PRODUCT_VERSION(3);
 
 STARTUP(System.enableFeature(FEATURE_RETAINED_MEMORY));
 
@@ -121,13 +135,17 @@ void setup() {
     delay(2000);    // give the module a long time to warm up just in case?
 
     // select internal antenna
-    //antennaSelect(internalANT);
-    antennaSelect(externalANT);
+    antennaSelect(internalANT);
+    //antennaSelect(externalANT);
 
 
     //suggest_time_and_location();
 
     initAccel();
+
+    mlx.begin();
+
+    locator.withSubscribe(locationCallback).withLocatePeriodic(60);
 }
 
 
@@ -151,6 +169,9 @@ void loop() {
     if (hasMotion) {
         Serial.println("BUMP!");
         lastMotion = now;
+
+        Particle.publish("motion!", String(millis()));
+        delay(500);
 
         if (Particle.connected() == false) {
             Serial.println("CONNECTING DUE TO MOTION!");
@@ -201,8 +222,9 @@ void loop() {
 //    }
 
 
-            publishLevel();
+    publishLevel();
 
+    locator.loop();
 
     delay(10);
 }
@@ -217,14 +239,17 @@ void checkGPS() {
             Serial.println(GPS.lastNMEA());
             GPS.parse(GPS.lastNMEA());
 
+            if (GPS.latitude != 0) {
+                usingCellularLocation = false;
+            }
+
             //Serial.println("my location is " + String::format(" %f, %f, ", GPS.latitude, GPS.longitude));
         }
     }
-
-
-    //+ "\"c_lat\":" + String(convertDegMinToDecDeg(GPS.latitude))
-    //+ ",\"c_lng\":" + String(convertDegMinToDecDeg(GPS.longitude))
 }
+
+
+
 
 void initAccel() {
     accel.begin(LIS3DH_DEFAULT_ADDRESS);
@@ -267,18 +292,31 @@ void publishGPS() {
 
 
 
-    float latitude = convertDegMinToDecDeg(GPS.latitude);
-    float longitude = convertDegMinToDecDeg(GPS.longitude);
+//---
+    float latitude, longitude, accuracy;
+
+    if (usingCellularLocation) {
+        latitude = cellularLatitude;
+        longitude = cellularLongitude;
+        accuracy = cellularAccuracy;
+    }
+    else {
+        latitude = convertDegMinToDecDeg(GPS.latitude);
+        longitude = convertDegMinToDecDeg(GPS.longitude);
+        accuracy = GPS.fixquality;
+    }
 
     if ((latitude != 0) && (longitude != 0)) {
         String trkJsonLoc = String("{")
-            + "\"c_lat\":" + String(convertDegMinToDecDeg(GPS.latitude))
-            + ",\"c_lng\":" + String(convertDegMinToDecDeg(GPS.longitude))
-            + ",\"c_unc\":" + String(GPS.fixquality)
+            + "\"c_lat\":" + String(latitude)
+            + ",\"c_lng\":" + String(longitude)
+            + ",\"c_unc\":" + String(accuracy)
             + ",\"c_alt\":" + String(GPS.altitude)
             + "}";
-         Particle.publish("trk/loc", trkJsonLoc, 60, PRIVATE);
-     }
+         Particle.publish("trk/loc", trkJsonLoc, PRIVATE, WITH_ACK);
+         lastPublish = millis();
+    }
+    //---
 
 
     float batteryVoltage = fuel.getVCell();
@@ -301,9 +339,8 @@ void publishGPS() {
 }
 
 
-
 void publishLevel() {
-    int levelValue = getLevelReading();
+    int levelValue = mlx.readObjectTempF();
 
     accel.read();
     float aX = accel.x;
@@ -312,44 +349,52 @@ void publishLevel() {
 
     //float temperatureC = ((3300*analogRead(A0)/4096.0)-500)/10.0;
     //float temperatureF = (temperatureC * (9/5)) + 32;
-    int temperatureF = 103;
+    //int temperatureF = 103;
+    float temperatureF = mlx.readObjectTempF();
 
      unsigned int now = millis();
-     if ((levelValue == lastLevel) || ((now - lastReading) < 2500)) {
-        return;
+     int elapsed = (now - lastReading);
+
+    // if it's different and at least 500ms have elapsed, or 15 seconds have elapsed
+    bool differentEnough = !value_within(levelValue, lastLevel, 1);
+
+    //if  ((levelValue != lastLevel) && (elapsed > 1500) || (elapsed> 15000)) {
+    if  (differentEnough && (elapsed > 1500) || (elapsed> 15000)) {
+         lastReading = now;
+         lastLevel = levelValue;
+
+         String sensorJson = String("{")
+                + "\"level\":" + String::format("%d", levelValue)
+                + ",\"tempF\":" + String::format("%.2f", temperatureF)
+                + ",\"x\":" + String::format("%.2f", aX)
+                + ",\"y\":" + String::format("%.2f", aY)
+                + ",\"z\":" + String::format("%.2f", aZ)
+
+                + "}";
+         Particle.publish("trk/env", sensorJson, 60, PRIVATE);
+
+
      }
-     lastReading = now;
-     lastLevel = levelValue;
-
-     String sensorJson = String("{")
-            + "\"level\":" + String::format("%d", levelValue)
-            + ",\"tempF\":" + String::format("%d", temperatureF)
-            + ",\"x\":" + String::format("%.2f", aX)
-            + ",\"y\":" + String::format("%.2f", aY)
-            + ",\"z\":" + String::format("%.2f", aZ)
-
-            + "}";
-     Particle.publish("trk/env", sensorJson, 60, PRIVATE);
 }
 
 
-int getLevelReading() {
-
-    //
-    int emptyLevelValue = 3500;
-    int fullLevelValue = 2460;
-    // about 2 inches of water ->
-    //int levelValue = analogRead(D0) - 2434;
-
-    //delay(50);
-    int levelReading = analogRead(A0);
-    int levelValue = map(levelReading, fullLevelValue, emptyLevelValue, 0, 100);
-    levelValue = 100 - levelValue;  // flip it
-
-    Serial.println("water level is " + String(levelReading) + " percentage full is " + String(levelValue));
-
-    return levelValue;
-}
+//int getLevelReading() {
+//
+//    //
+//    int emptyLevelValue = 3500;
+//    int fullLevelValue = 2460;
+//    // about 2 inches of water ->
+//    //int levelValue = analogRead(D0) - 2434;
+//
+//    //delay(50);
+//    int levelReading = analogRead(A0);
+//    int levelValue = map(levelReading, fullLevelValue, emptyLevelValue, 0, 100);
+//    levelValue = 100 - levelValue;  // flip it
+//
+//    //Serial.println("water level is " + String(levelReading) + " percentage full is " + String(levelValue));
+//
+//    return levelValue;
+//}
 
 int crc8(String str) {
   int len = str.length();
@@ -407,6 +452,28 @@ void antennaSelect(uint8_t *buf){
         Serial.print(",");
     }
     Serial.println("");
+}
+
+bool value_within(float testValue, float referenceValue, float plusMinus) {
+     return ((testValue >= (referenceValue - plusMinus))
+          && (testValue <= (referenceValue + plusMinus)));
+}
+
+void locationCallback(float lat, float lon, float accuracy) {
+  // Handle the returned location data for the device. This method is passed three arguments:
+  // - Latitude
+  // - Longitude
+  // - Accuracy of estimated location (in meters)
+
+  //Particle.publish("cellLocation" "CB called " + String(lat));
+
+  // if we don't have a fix from our GPS sensor yet, then use the cellular location
+  if (GPS.latitude == 0) {
+    cellularLatitude = lat;
+    cellularLongitude = lon;
+    cellularAccuracy = accuracy;
+    usingCellularLocation = true;
+  }
 }
 
 //
